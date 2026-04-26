@@ -182,8 +182,7 @@ description: |
 
 ### 2.2 广播竞争机制
 
-```
-python
+```python
 from dataclasses import dataclass
 from typing import Any, Optional
 import time
@@ -692,3 +691,102 @@ class GoalGenerator:
 
 6.1 Docker Compose 部署文件
 
+```yaml
+version: '3.8'
+services:
+  # 全局工作空间
+  global_workspace:
+    image: agi/global-workspace:latest
+    ports:
+      - "4222:4222"
+    environment:
+      - MAX_QUEUE_SIZE=100
+      - FOCUS_DURATION_MS=120
+
+  # 工作记忆
+  working_memory:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru
+
+  # 情景记忆
+  episodic_memory:
+    image: milvusdb/milvus:latest
+    ports:
+      - "19530:19530"
+    environment:
+      - METRICS_PORT=9091
+
+  # 语义记忆
+  semantic_memory:
+    image: neo4j:5-enterprise
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+  # 程序性记忆
+  procedural_memory:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+  # 自我模型服务
+  self_model:
+    image: agi/self-model:latest
+    ports:
+      - "50080:50080"
+
+  # 目标生成器
+  goal_generator:
+    image: agi/goal-generator:latest
+    ports:
+      - "50090:50090"
+```
+
+6.2 系统启动顺序
+
+```bash
+#!/bin/bash
+# AGI系统启动脚本
+
+echo "启动AGI系统..."
+
+# 1. 启动存储层
+docker-compose up -d working_memory episodic_memory semantic_memory procedural_memory
+sleep 5
+
+# 2. 启动认知核心
+docker-compose up -d global_workspace self_model goal_generator
+sleep 3
+
+# 3. 启动推理引擎
+docker-compose up -d inference_system1 inference_system2 world_model
+sleep 10
+
+# 4. 启动感知层
+docker-compose up -d text_encoder vision_encoder audio_encoder multimodal_fusion
+sleep 3
+
+# 5. 启动输出层
+docker-compose up -d text_generator image_generator
+
+echo "AGI系统启动完成"
+echo "全局工作空间: http://localhost:4222"
+echo "自我模型服务: http://localhost:50080"
+echo "目标生成器:   http://localhost:50090"
+```
+
+---
+
+七、使用说明
+
+当Claude调用本技能时，根据用户需求自动激活对应能力：
+
+1. 全局工作空间设计需求：提供广播竞争机制、注意力调度、工作记忆交互方案。
+2. 自我模型设计需求：提供能力边界评估、置信度校准、行为历史追踪、资源感知方案。
+3. 长期记忆设计需求：提供情景/语义/程序性记忆的存储架构与检索策略。
+4. 目标生成设计需求：提供内在动机引擎、目标排序与冲突消解、目标分解方案。
+5. 综合AGI系统架构需求：提供从感知到输出的端到端架构方案。
+
+```
